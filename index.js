@@ -1,6 +1,9 @@
 // Requerir express
 const express = require("express");
 const bodyParser = require("body-parser");
+const sequelize = require("./src/database");
+const Message = require("./src/models/Message");
+const Ticket = require("./src/models/Ticket");
 
 // inicializar mi app
 const app = express();
@@ -8,83 +11,59 @@ const app = express();
 // midleware
 app.use(bodyParser.json());
 
-const tickets = [
-    {
-        id: 1,
-        name: "Ajustar los puntos de red",
-        messages: [
-            { id: 1, text: "Se me rompió el conector rj45 de mi cable" },
-            { id: 2, text: "En qué oficina está?" },
-        ],
-    },
-];
-
 // rutas
 app.get("/", (req, res) => {
     res.send("Soy una app de tickets");
 });
 
-app.get("/tickets", (req, res) => {
+app.get("/tickets", async (req, res) => {
+    const tickets = await Ticket.findAll();
     res.json(tickets);
 });
 
-app.post("/tickets", (req, res) => {
+app.post("/tickets", async (req, res) => {
+    const { name } = req.body;
+
+    const ticket = await Ticket.create({
+        name,
+    });
+
+    res.json(ticket);
+});
+
+app.get("/tickets/:id", async (req, res) => {
     try {
-        const { name } = req.body;
+        const { id } = req.params;
 
-        const exist = Boolean(tickets.find((ticket) => ticket.name === name)); // si es undefined con boolean lo transforma a false
+        const ticket = await Ticket.findByPk(id);
 
-        if (exist) {
-            throw new Error("La tarea ya existe");
-        }
+        if (!ticket) throw new Error("El ticket no se encontró");
 
-        const nuevoId = tickets.length + 1;
-        const ticket = { id: nuevoId, name, messages: [] };
-        tickets.push(ticket);
-        return res.json({
-            message: `Se creó el ticket con el id ${ticket.id}`,
-            details: ticket,
-        });
+        res.json(ticket);
     } catch (error) {
-        res.status(400).json({
-            error: error.message,
-        });
+        res.status(404).json({ error: error.message });
     }
 });
 
-app.get("/tickets/:id", (req, res) => {
+app.put("/tickets/:id", async (req, res) => {
     try {
-        const { id } = req.params;
-        const ticketPedido = tickets.find((ticket) => ticket.id == id);
-        if (!ticketPedido) {
-            throw new Error("El ticket no existe");
-        }
-        res.json({ result: ticketPedido });
-    } catch (error) {
-        res.status(404).json({
-            error: error.message,
-        });
-    }
-});
-
-app.put("/tickets/:id", (req, res) => {
-    try {
-        const { id } = req.params;
         const { name } = req.body;
+        const { id } = req.params;
 
-        const ticketIndex = tickets.findIndex((ticket) => ticket.id == id); // devuelve -1 si no lo encuentra
+        const updatedTicket = await Ticket.update(
+            { name },
+            {
+                where: {
+                    id,
+                },
+                returning: true,
+            }
+        );
 
-        if (ticketIndex === -1) throw new Error("El ticket no existe");
+        const [_, rowsInfo] = updatedTicket;
 
-        let ticket = tickets[ticketIndex];
-
-        ticket = { ...ticket, name };
-
-        tickets[ticketIndex] = ticket;
-
-        res.status(200).json({
-            result: tickets[ticketIndex],
-        });
+        res.status(200).json(rowsInfo);
+        
     } catch (error) {
         res.status(400).json({
             error: error.message,
@@ -203,7 +182,12 @@ app.patch("/tickets/:id/mensajes/:idMensaje", (req, res) => {
     );
 });
 
-// levantar la aplicación
-app.listen(3000, () => {
-    console.log("El servidor se está ejecutando en http://localhost:3000");
-});
+async function run() {
+    await sequelize.sync();
+    // levantar la aplicación
+    app.listen(3000, () => {
+        console.log("El servidor se está ejecutando en http://localhost:3000");
+    });
+}
+
+run();

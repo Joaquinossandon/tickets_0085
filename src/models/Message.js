@@ -9,5 +9,6 @@ const Message = sequelize.define("message", {
 });
 
 Message.belongsTo(Ticket);
+Ticket.hasMany(Message);
 
 module.exports = Message;

@@ -1,18 +1,17 @@
 const Message = require("../models/Message");
+const Ticket = require("../models/Ticket");
 
 exports.getAllFromTicket = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const messages = await Message.findAll({
-            where: {
-                ticketId: id,
-            },
+        const ticket = await Ticket.findByPk(id, {
+            include: Message,
         });
 
         res.status(200).json({
-            idTicket: id,
-            messages,
+            idTicket: ticket.id,
+            messages: ticket.messages,
         });
     } catch (error) {
         res.status(400).json({
@@ -26,15 +25,11 @@ exports.create = async (req, res) => {
         const { id } = req.params;
         const { text } = req.body;
 
-        const result = await Message.create(
-            {
-                ticketId: id,
-                text,
-            },
-            {
-                returning: true,
-            }
-        );
+        const ticket = await Ticket.findByPk(id);
+        const result = await ticket.createMessage({ text });
+
+        // addMessage => Agrega un mensaje que <ya existe> y relacionarlo con un Ticket.
+        // createMessage => Crea un nuevo registro en la tabla mensajes relacionada con el ticket.
 
         res.status(201).json({
             message: "Se creó el mensaje",
